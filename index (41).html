@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="utf-8">
+    <title>WebXR Lithium Atom - Lab 3</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <style>
+        body { margin: 0; overflow: hidden; font-family: sans-serif; }
+    </style>
+    <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+    </script>
+</head>
+<body>
+    <script type="module">
+        import * as THREE from 'three';
+        import { ARButton } from 'three/addons/webxr/ARButton.js';
+
+        let camera, scene, renderer;
+        let electrons = [];
+
+        const init = () => {
+            // 1. Создаем сцену
+            scene = new THREE.Scene();
+
+            // 2. Настраиваем камеру
+            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+
+            // 3. Настраиваем рендерер с поддержкой XR (AR)
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.xr.enabled = true; 
+            document.body.appendChild(renderer.domElement);
+
+            // 4. Добавляем кнопку ARButton на экран
+            document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['local'] }));
+
+            // 5. Освещение
+            const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
+            scene.add(light);
+
+            // 6. Создаем группу для атома
+            const atomGroup = new THREE.Group();
+            atomGroup.position.set(0, -0.2, -1.5); 
+            atomGroup.scale.set(0.15, 0.15, 0.15); 
+            scene.add(atomGroup);
+
+            // 7. Ядро атома
+            const coreGeom = new THREE.SphereGeometry(0.7, 32, 32);
+            const coreMat = new THREE.MeshStandardMaterial({
+                color: 0x8888ff,
+                emissive: 0x222244,
+                roughness: 0.4,
+                metalness: 0.2
+            });
+            const core = new THREE.Mesh(coreGeom, coreMat);
+            atomGroup.add(core);
+
+            // 8. Функция генерации электронов
+            const createElectronSystem = (color, tiltZ, speed) => {
+                const tiltGroup = new THREE.Group();
+                tiltGroup.rotation.z = tiltZ;
+
+                const ellipseContainer = new THREE.Group();
+                ellipseContainer.scale.set(0.38, 1, 1); 
+                tiltGroup.add(ellipseContainer);
+
+                const torusGeom = new THREE.TorusGeometry(5, 0.04, 16, 100);
+                const torusMat = new THREE.MeshStandardMaterial({ 
+                    color: 0x000000, 
+                    emissive: 0x000000,
+                    emissiveIntensity: 0.1,
+                    transparent: true, 
+                    opacity: 0.8 
+                });
+                const torus = new THREE.Mesh(torusGeom, torusMat);
+                ellipseContainer.add(torus);
+
+                const electronPivot = new THREE.Group();
+                ellipseContainer.add(electronPivot);
+
+                const elGeom = new THREE.SphereGeometry(0.25, 16, 16);
+                const elMat = new THREE.MeshStandardMaterial({ color: color, emissive: color, emissiveIntensity: 0.5 });
+                const electron = new THREE.Mesh(elGeom, elMat);
+                electron.position.set(5, 0, 0); 
+                electronPivot.add(electron);
+
+                atomGroup.add(tiltGroup);
+
+                return { pivot: electronPivot, speed: speed };
+            };
+
+            // Создаем 3 электрона (Красный, Синий, Зеленый)
+            electrons = [
+                createElectronSystem(0xff0000, 0, 0.02),                  
+                createElectronSystem(0x0000ff, Math.PI / 3, 0.015),        
+                createElectronSystem(0x00ff00, (Math.PI * 2) / 3, 0.01)    
+            ];
+
+            window.addEventListener('resize', onWindowResize);
+
+            // 9. Запуск цикла анимации
+            renderer.setAnimationLoop(render);
+        };
+
+        const onWindowResize = () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        };
+
+        const render = () => {
+            // Анимация вращения электронов
+            electrons.forEach(el => {
+                el.pivot.rotation.z += el.speed;
+            });
+
+            renderer.render(scene, camera);
+        };
+
+        init();
+    </script>
+</body>
+</html>
